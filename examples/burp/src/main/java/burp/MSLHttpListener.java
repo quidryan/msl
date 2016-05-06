@@ -23,6 +23,7 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Set;
 
+import com.netflix.msl.util.ReadJson;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -304,7 +305,7 @@ public class MSLHttpListener implements IHttpListener {
                 if(!messageHeader.getKeyRequestData().isEmpty())
                     headerdataJO.put(KEY_KEY_REQUEST_DATA, JsonUtils.createArray(messageHeader.getKeyRequestData()));
                 if(messageHeader.getKeyResponseData() != null) {
-                    final JSONObject keyResponseDataJO = new JSONObject(messageHeader.getKeyResponseData().toJSONString());
+                    final JSONObject keyResponseDataJO = ReadJson.readValue(messageHeader.getKeyResponseData().toJSONString());
                     if(messageHeader.getKeyResponseData().getMasterToken() != null) {
                         masterToken = messageHeader.getKeyResponseData().getMasterToken();
                         keyResponseDataJO.remove(KEY_MASTER_TOKEN);
@@ -355,7 +356,7 @@ public class MSLHttpListener implements IHttpListener {
 
     private JSONObject parseUserIdToken(final UserIdToken userIdToken, final MasterToken masterToken) throws JSONException, MslException {
 
-        final JSONObject userIdTokenJO = new JSONObject(userIdToken.toJSONString());
+        final JSONObject userIdTokenJO = ReadJson.readValue(userIdToken.toJSONString());
         final ICryptoContext cryptoContext = ctx.getMslCryptoContext();
 
         byte[] tokendata;
@@ -386,7 +387,7 @@ public class MSLHttpListener implements IHttpListener {
         byte[] userdata;
         long mtSerialNumber;
         try {
-            tokenDataJO = new JSONObject(tokenDataJson);
+            tokenDataJO = ReadJson.readValue(tokenDataJson);
             final long renewalWindow = tokenDataJO.getLong(KEY_RENEWAL_WINDOW);
             final long expiration = tokenDataJO.getLong(KEY_EXPIRATION);
             if (expiration < renewalWindow)
@@ -418,7 +419,7 @@ public class MSLHttpListener implements IHttpListener {
         if (userdata != null) {
             final String userDataJson = new String(userdata, MslConstants.DEFAULT_CHARSET);
             try {
-                final JSONObject userDataJO = new JSONObject(userDataJson);
+                final JSONObject userDataJO = ReadJson.readValue(userDataJson);
                 tokenDataJO.put(KEY_USERDATA, userDataJO);
             } catch (final JSONException e) {
                 throw new MslEncodingException(MslError.USERIDTOKEN_USERDATA_PARSE_ERROR, "userdata " + userDataJson, e).setMasterToken(masterToken);
@@ -434,7 +435,7 @@ public class MSLHttpListener implements IHttpListener {
 
     private JSONObject parseMasterToken(final MasterToken masterToken) throws JSONException, MslException {
 
-        final JSONObject masterTokenJO = new JSONObject(masterToken.toJSONString());
+        final JSONObject masterTokenJO = ReadJson.readValue(masterToken.toJSONString());
         final ICryptoContext cryptoContext = ctx.getMslCryptoContext();
 
         byte[] tokendata;
@@ -464,7 +465,7 @@ public class MSLHttpListener implements IHttpListener {
         final JSONObject tokenDataJO;
         byte[] sessiondata;
         try {
-            tokenDataJO = new JSONObject(tokenDataJson);
+            tokenDataJO = ReadJson.readValue(tokenDataJson);
             final long renewalWindow = tokenDataJO.getLong(KEY_RENEWAL_WINDOW);
             final long expiration = tokenDataJO.getLong(KEY_EXPIRATION);
             if (expiration < renewalWindow)
@@ -494,7 +495,7 @@ public class MSLHttpListener implements IHttpListener {
             // Parse JSON.
             final String sessionDataJson = new String(sessiondata, MslConstants.DEFAULT_CHARSET);
             try {
-                final JSONObject sessionDataJO = new JSONObject(sessionDataJson);
+                final JSONObject sessionDataJO = ReadJson.readValue(sessionDataJson);
                 tokenDataJO.put(KEY_SESSIONDATA, sessionDataJO);
             } catch (final JSONException e) {
                 throw new MslEncodingException(MslError.MASTERTOKEN_SESSIONDATA_PARSE_ERROR, "sessiondata " + sessionDataJson, e);

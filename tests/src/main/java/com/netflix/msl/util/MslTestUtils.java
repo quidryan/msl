@@ -115,7 +115,7 @@ public class MslTestUtils {
         final SecretKey hmacKey = MockPresharedAuthenticationFactory.KPH;
         final MasterToken masterToken = new MasterToken(ctx, renewalWindow, expiration, 1L, 1L, null, identity, encryptionKey, hmacKey);
         final String json = masterToken.toJSONString();
-        final JSONObject jo = new JSONObject(json);
+        final JSONObject jo = ReadJson.readValue(json);
         final byte[] signature = Base64.decode(jo.getString("signature"));
         ++signature[1];
         jo.put("signature", Base64.encode(signature));
@@ -163,7 +163,7 @@ public class MslTestUtils {
         final Date expiration = new Date(System.currentTimeMillis() + 20000);
         final UserIdToken userIdToken = new UserIdToken(ctx, renewalWindow, expiration, masterToken, serialNumber, null, user);
         final String json = userIdToken.toJSONString();
-        final JSONObject jo = new JSONObject(json);
+        final JSONObject jo = ReadJson.readValue(json);
         final byte[] signature = Base64.decode(jo.getString("signature"));
         ++signature[1];
         jo.put("signature", Base64.encode(signature));

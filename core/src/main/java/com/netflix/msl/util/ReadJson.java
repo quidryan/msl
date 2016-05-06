@@ -49,7 +49,7 @@ public class ReadJson {
         impl = jsonReader;
     }
 
-    public static JSONObject read(String str) {
+    public static JSONObject readValue(String str) {
         return impl.readValue(str);
     }
 }

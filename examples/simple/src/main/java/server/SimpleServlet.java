@@ -35,6 +35,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.netflix.msl.util.ReadJson;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.json.JSONObject;
 
@@ -194,7 +195,7 @@ public class SimpleServlet extends HttpServlet {
 
             // Output the request.
             final String requestJson = simpleRequest.toJSONString();
-            final JSONObject requestJo = new JSONObject(requestJson);
+            final JSONObject requestJo = ReadJson.readValue(requestJson);
             System.out.println(NEWLINE + "REQUEST" + NEWLINE +
                 "======" + NEWLINE +
                 requestJo.toString(4) + NEWLINE +

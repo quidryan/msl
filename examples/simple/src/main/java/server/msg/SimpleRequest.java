@@ -21,6 +21,7 @@ import java.io.Reader;
 import java.util.Map;
 import java.util.Set;
 
+import com.netflix.msl.util.ReadJson;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONString;
@@ -103,7 +104,7 @@ public abstract class SimpleRequest implements JSONString {
         } finally {
             try { r.close(); } catch(final IOException e) {}
         }
-        final JSONObject json = new JSONObject(jsonBuilder.toString());
+        final JSONObject json = ReadJson.readValue(jsonBuilder.toString());
         
         // Parse request.
         final String typeString;

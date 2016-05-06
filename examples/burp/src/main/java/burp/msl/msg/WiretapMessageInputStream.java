@@ -20,6 +20,7 @@ import java.nio.charset.Charset;
 import java.util.Map;
 import java.util.Set;
 
+import com.netflix.msl.util.ReadJson;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -137,7 +138,7 @@ public class WiretapMessageInputStream extends MessageInputStream {
         // Parse the decrypted payload as JSON.
         final String payloadJson = new String(plaintext, MslConstants.DEFAULT_CHARSET);
         try {
-            final JSONObject payloadJO = new JSONObject(payloadJson);
+            final JSONObject payloadJO = ReadJson.readValue(payloadJson);
             return payloadJO;
         } catch (final JSONException e) {
             throw new MslEncodingException(MslError.JSON_PARSE_ERROR, "payload chunk payload " + payloadJson, e);

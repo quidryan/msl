@@ -16,7 +16,7 @@
 
 package mslcli.common.util;
 
-import org.json.JSONObject;
+import com.netflix.msl.util.ReadJson;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -221,7 +221,7 @@ public class MslStoreData implements Serializable {
          * @throws MslCryptoException
          */
         MasterToken get(final MslContext ctx) throws MslEncodingException, MslException, MslCryptoException {
-            return new MasterToken(ctx, new JSONObject(s));
+            return new MasterToken(ctx, ReadJson.readValue(s));
         }
         /** JSON-serialized master token */
         private final String s;
@@ -249,7 +249,7 @@ public class MslStoreData implements Serializable {
          * @throws MslCryptoException
          */
         UserIdToken get(final MslContext ctx, final MasterToken mt) throws MslEncodingException, MslException, MslCryptoException {
-            return new UserIdToken(ctx, new JSONObject(s), mt);
+            return new UserIdToken(ctx, ReadJson.readValue(s), mt);
         }
         /** JSON-serialized user id token */
         private final String s;
@@ -283,7 +283,7 @@ public class MslStoreData implements Serializable {
         ServiceToken get(final MslContext ctx, final MasterToken mt, final UserIdToken uit)
             throws MslEncodingException, MslException, MslCryptoException
         {
-            return new ServiceToken(ctx, new JSONObject(s), mt, uit, (ICryptoContext)null);
+            return new ServiceToken(ctx, ReadJson.readValue(s), mt, uit, (ICryptoContext)null);
         }
         /** JSON-serialized service token */
         private final String s;
