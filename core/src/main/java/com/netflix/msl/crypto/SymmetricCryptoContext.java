@@ -43,6 +43,7 @@ import com.netflix.msl.MslCryptoException;
 import com.netflix.msl.MslEncodingException;
 import com.netflix.msl.MslError;
 import com.netflix.msl.MslInternalException;
+import com.netflix.msl.util.JSONUtil;
 import com.netflix.msl.util.MslContext;
 import com.netflix.msl.util.MslUtils;
 
@@ -201,7 +202,7 @@ public class SymmetricCryptoContext implements ICryptoContext {
             throw new MslCryptoException(MslError.DECRYPT_NOT_SUPPORTED, "no encryption/decryption key");
         try {
             // Reconstitute encryption envelope.
-            final JSONObject encryptionEnvelopeJsonObj = new JSONObject(new String(data, MslConstants.DEFAULT_CHARSET));
+            final JSONObject encryptionEnvelopeJsonObj = JSONUtil.readValue(new String(data, MslConstants.DEFAULT_CHARSET));
             final MslCiphertextEnvelope encryptionEnvelope = new MslCiphertextEnvelope(encryptionEnvelopeJsonObj, MslCiphertextEnvelope.Version.V1);
             
             // Verify key ID.

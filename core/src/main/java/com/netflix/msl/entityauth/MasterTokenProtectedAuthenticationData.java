@@ -29,6 +29,7 @@ import com.netflix.msl.crypto.ICryptoContext;
 import com.netflix.msl.crypto.SessionCryptoContext;
 import com.netflix.msl.tokens.MasterToken;
 import com.netflix.msl.util.Base64;
+import com.netflix.msl.util.JSONUtil;
 import com.netflix.msl.util.MslContext;
 
 /**
@@ -150,7 +151,7 @@ public class MasterTokenProtectedAuthenticationData extends EntityAuthentication
             if (!cryptoContext.verify(this.ciphertext, this.signature))
                 throw new MslEntityAuthException(MslError.ENTITYAUTH_VERIFICATION_FAILED, "master token protected authdata " + authdataJO.toString());
             final byte[] plaintext = cryptoContext.decrypt(this.ciphertext);
-            final JSONObject internalAuthdataJO = new JSONObject(new String(plaintext, MslConstants.DEFAULT_CHARSET));
+            final JSONObject internalAuthdataJO = JSONUtil.readValue(new String(plaintext, MslConstants.DEFAULT_CHARSET));
             this.authdata = EntityAuthenticationData.create(ctx, internalAuthdataJO);
         } catch (final JSONException e) {
             throw new MslEncodingException(MslError.JSON_PARSE_ERROR, "master token protected authdata " + authdataJO.toString(), e);
@@ -184,7 +185,7 @@ public class MasterTokenProtectedAuthenticationData extends EntityAuthentication
             jsonObj.put(KEY_MASTER_TOKEN, masterToken);
             jsonObj.put(KEY_AUTHENTICATION_DATA, Base64.encode(ciphertext));
             jsonObj.put(KEY_SIGNATURE, Base64.encode(signature));
-            return new JSONObject(jsonObj.toString());
+            return JSONUtil.readValue(jsonObj.toString());
         } catch (final JSONException e) {
             throw new MslEncodingException(MslError.JSON_ENCODE_ERROR, "master token protected authdata", e);
         }

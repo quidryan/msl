@@ -46,6 +46,7 @@ import org.json.JSONStringer;
 import com.netflix.msl.MslCryptoException;
 import com.netflix.msl.MslError;
 import com.netflix.msl.MslInternalException;
+import com.netflix.msl.util.JSONUtil;
 import com.netflix.msl.util.JsonUtils;
 import com.netflix.msl.util.MslContext;
 
@@ -579,7 +580,7 @@ public class JsonWebEncryptionCryptoContext implements ICryptoContext {
         final byte[] ciphertext, at;
         if (data[0] == '{') {
             try {
-                final JSONObject serializationJo = new JSONObject(serialization);
+                final JSONObject serializationJo = JSONUtil.readValue(serialization);
                 ivB64 = serializationJo.getString(KEY_INITIALIZATION_VECTOR);
                 ciphertext = JsonUtils.b64urlDecode(serializationJo.getString(KEY_CIPHERTEXT));
                 
@@ -626,7 +627,7 @@ public class JsonWebEncryptionCryptoContext implements ICryptoContext {
         final Algorithm algo;
         final Encryption enc;
         try {
-            final JSONObject headerJo = new JSONObject(header);
+            final JSONObject headerJo = JSONUtil.readValue(header);
             final String algoName = headerJo.getString(KEY_ALGORITHM);
             try {
                 algo = Algorithm.fromString(algoName);

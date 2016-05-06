@@ -51,6 +51,7 @@ import com.netflix.msl.userauth.UserAuthenticationData;
 import com.netflix.msl.userauth.UserAuthenticationFactory;
 import com.netflix.msl.userauth.UserAuthenticationScheme;
 import com.netflix.msl.util.Base64;
+import com.netflix.msl.util.JSONUtil;
 import com.netflix.msl.util.JsonUtils;
 import com.netflix.msl.util.MslContext;
 
@@ -559,7 +560,7 @@ public class MessageHeader extends Header {
         final String headerdataJson = new String(plaintext, MslConstants.DEFAULT_CHARSET);
         final JSONObject headerdataJO;
         try {
-            headerdataJO = new JSONObject(headerdataJson);
+            headerdataJO = JSONUtil.readValue(headerdataJson);
             
             // Pull the message ID first because any error responses need to
             // use it.

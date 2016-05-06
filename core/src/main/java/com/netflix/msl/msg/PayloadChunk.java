@@ -31,6 +31,7 @@ import com.netflix.msl.MslInternalException;
 import com.netflix.msl.MslMessageException;
 import com.netflix.msl.crypto.ICryptoContext;
 import com.netflix.msl.util.Base64;
+import com.netflix.msl.util.JSONUtil;
 import com.netflix.msl.util.MslUtils;
 
 /**
@@ -199,7 +200,7 @@ public class PayloadChunk implements JSONString {
         final byte[] plaintext = cryptoContext.decrypt(payload);
         final String payloadJson = new String(plaintext, MslConstants.DEFAULT_CHARSET);
         try {
-            final JSONObject payloadJO = new JSONObject(payloadJson);
+            final JSONObject payloadJO = JSONUtil.readValue(payloadJson);
             sequenceNumber = payloadJO.getLong(KEY_SEQUENCE_NUMBER);
             if (sequenceNumber < 0 || sequenceNumber > MslConstants.MAX_LONG_VALUE)
                 throw new MslException(MslError.PAYLOAD_SEQUENCE_NUMBER_OUT_OF_RANGE, "payload chunk payload " + payloadJson);

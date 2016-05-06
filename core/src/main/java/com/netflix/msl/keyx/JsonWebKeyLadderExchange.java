@@ -55,6 +55,7 @@ import com.netflix.msl.tokens.MasterToken;
 import com.netflix.msl.tokens.TokenFactory;
 import com.netflix.msl.util.AuthenticationUtils;
 import com.netflix.msl.util.Base64;
+import com.netflix.msl.util.JSONUtil;
 import com.netflix.msl.util.MslContext;
 
 /**
@@ -813,7 +814,7 @@ public class JsonWebKeyLadderExchange extends KeyExchangeFactory {
         final String wrapJwkJson = new String(unwrappedWrapJwk, UTF_8);
         final JsonWebKey wrapJwk;
         try {
-            wrapJwk = new JsonWebKey(new JSONObject(wrapJwkJson));
+            wrapJwk = new JsonWebKey(JSONUtil.readValue(wrapJwkJson));
         } catch (final JSONException e) {
             throw new MslKeyExchangeException(MslError.INVALID_JWK, wrapJwkJson, e).setEntityAuthenticationData(entityAuthData);
         }
@@ -827,13 +828,13 @@ public class JsonWebKeyLadderExchange extends KeyExchangeFactory {
         final String hmacJwkJson = new String(unwrappedHmacJwk, UTF_8);
         final JsonWebKey encryptionJwk;
         try {
-            encryptionJwk = new JsonWebKey(new JSONObject(encryptionJwkJson));
+            encryptionJwk = new JsonWebKey(JSONUtil.readValue(encryptionJwkJson));
         } catch (final JSONException e) {
             throw new MslKeyExchangeException(MslError.INVALID_JWK, encryptionJwkJson, e).setEntityAuthenticationData(entityAuthData);
         }
         final JsonWebKey hmacJwk;
         try {
-            hmacJwk = new JsonWebKey(new JSONObject(hmacJwkJson));
+            hmacJwk = new JsonWebKey(JSONUtil.readValue(hmacJwkJson));
         } catch (final JSONException e) {
             throw new MslKeyExchangeException(MslError.INVALID_JWK, hmacJwkJson, e).setEntityAuthenticationData(entityAuthData);
         }
