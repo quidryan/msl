@@ -129,7 +129,7 @@ public class JsonUtils {
                 array.put(o);
             } else if (o instanceof JSONString) {
                 final JSONString js = (JSONString)o;
-                final JSONObject jo = JSONUtil.readValue(js.toJSONString());
+                final JSONObject jo = ReadJson.readValue(js.toJSONString());
                 array.put(jo);
             } else if (o instanceof Enum) {
                 array.put(((Enum)o).name());
@@ -150,8 +150,8 @@ public class JsonUtils {
      * @see JsonUtils#equals(JSONObject, JSONObject)
      */
     public static boolean objectEquals(final String js1, final String js2) throws JSONException {
-        final JSONObject o1 = JSONUtil.readValue(js1);
-        final JSONObject o2 = JSONUtil.readValue(js2);
+        final JSONObject o1 = ReadJson.readValue(js1);
+        final JSONObject o2 = ReadJson.readValue(js2);
         return JsonUtils.equals(o1, o2);
     }
     

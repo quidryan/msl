@@ -35,7 +35,7 @@ import com.netflix.msl.MslInternalException;
 import com.netflix.msl.crypto.ICryptoContext;
 import com.netflix.msl.crypto.JcaAlgorithm;
 import com.netflix.msl.util.Base64;
-import com.netflix.msl.util.JSONUtil;
+import com.netflix.msl.util.ReadJson;
 import com.netflix.msl.util.MslContext;
 
 /**
@@ -292,7 +292,7 @@ public class MasterToken implements JSONString {
         // Pull the token data.
         final String tokenDataJson = new String(tokendata, MslConstants.DEFAULT_CHARSET);
         try {
-            final JSONObject tokenDataJO = JSONUtil.readValue(tokenDataJson);
+            final JSONObject tokenDataJO = ReadJson.readValue(tokenDataJson);
             renewalWindow = tokenDataJO.getLong(KEY_RENEWAL_WINDOW);
             expiration = tokenDataJO.getLong(KEY_EXPIRATION);
             if (expiration < renewalWindow)
@@ -323,7 +323,7 @@ public class MasterToken implements JSONString {
             final String encryptionB64, signatureB64;
             final String encryptionAlgo, signatureAlgo;
             try {
-                final JSONObject sessionDataJO = JSONUtil.readValue(sessionDataJson);
+                final JSONObject sessionDataJO = ReadJson.readValue(sessionDataJson);
                 issuerData = (sessionDataJO.has(KEY_ISSUER_DATA)) ? sessionDataJO.getJSONObject(KEY_ISSUER_DATA) : null;
                 identity = sessionDataJO.getString(KEY_IDENTITY);
                 encryptionB64 = sessionDataJO.getString(KEY_ENCRYPTION_KEY);

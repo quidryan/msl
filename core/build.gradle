@@ -7,7 +7,6 @@ sourceCompatibility = '1.7' // Android maximum supported language level
 dependencies {
     compile 'org.bouncycastle:bcprov-jdk15on:1.46'
     compile 'org.json:json:20140107'
-    compile 'com.fasterxml.jackson.datatype:jackson-datatype-json-org:2.7.4'
 }
 
 task javadoc(type: Javadoc, overwrite: true) {

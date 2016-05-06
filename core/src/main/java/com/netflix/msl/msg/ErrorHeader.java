@@ -33,7 +33,7 @@ import com.netflix.msl.entityauth.EntityAuthenticationData;
 import com.netflix.msl.entityauth.EntityAuthenticationFactory;
 import com.netflix.msl.entityauth.EntityAuthenticationScheme;
 import com.netflix.msl.util.Base64;
-import com.netflix.msl.util.JSONUtil;
+import com.netflix.msl.util.ReadJson;
 import com.netflix.msl.util.MslContext;
 
 /**
@@ -217,7 +217,7 @@ public class ErrorHeader extends Header {
         final String errordataJson = new String(plaintext, MslConstants.DEFAULT_CHARSET);
         final JSONObject errordataJO;
         try {
-            errordataJO = JSONUtil.readValue(errordataJson);
+            errordataJO = ReadJson.readValue(errordataJson);
             messageId = errordataJO.getLong(KEY_MESSAGE_ID);
             if (this.messageId < 0 || this.messageId > MslConstants.MAX_LONG_VALUE)
                 throw new MslMessageException(MslError.MESSAGE_ID_OUT_OF_RANGE, "errordata " + errordataJson).setEntityAuthenticationData(entityAuthData);

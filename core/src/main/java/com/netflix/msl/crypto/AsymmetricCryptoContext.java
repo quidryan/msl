@@ -37,7 +37,7 @@ import com.netflix.msl.MslCryptoException;
 import com.netflix.msl.MslEncodingException;
 import com.netflix.msl.MslError;
 import com.netflix.msl.MslInternalException;
-import com.netflix.msl.util.JSONUtil;
+import com.netflix.msl.util.ReadJson;
 
 /**
  * An asymmetric crypto context performs encrypt/decrypt and sign/verify using
@@ -142,7 +142,7 @@ public abstract class AsymmetricCryptoContext implements ICryptoContext {
         Throwable reset = null;
         try {
             // Reconstitute encryption envelope.
-            final JSONObject encryptionEnvelopeJsonObj = JSONUtil.readValue(new String(data, MslConstants.DEFAULT_CHARSET));
+            final JSONObject encryptionEnvelopeJsonObj = ReadJson.readValue(new String(data, MslConstants.DEFAULT_CHARSET));
             final MslCiphertextEnvelope encryptionEnvelope = new MslCiphertextEnvelope(encryptionEnvelopeJsonObj, MslCiphertextEnvelope.Version.V1);
             
             // Verify key ID.

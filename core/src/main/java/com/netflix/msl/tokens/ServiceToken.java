@@ -30,7 +30,7 @@ import com.netflix.msl.MslException;
 import com.netflix.msl.MslInternalException;
 import com.netflix.msl.crypto.ICryptoContext;
 import com.netflix.msl.util.Base64;
-import com.netflix.msl.util.JSONUtil;
+import com.netflix.msl.util.ReadJson;
 import com.netflix.msl.util.MslContext;
 import com.netflix.msl.util.MslUtils;
 
@@ -133,7 +133,7 @@ public class ServiceToken implements JSONString {
             }
             if (tokendata == null || tokendata.length == 0)
                 throw new MslEncodingException(MslError.SERVICETOKEN_TOKENDATA_MISSING, "servicetoken " + serviceTokenJO.toString());
-            final JSONObject tokenDataJO = JSONUtil.readValue(new String(tokendata, MslConstants.DEFAULT_CHARSET));
+            final JSONObject tokenDataJO = ReadJson.readValue(new String(tokendata, MslConstants.DEFAULT_CHARSET));
             final String name = tokenDataJO.getString(KEY_NAME);
             if (cryptoContexts.containsKey(name))
                 return cryptoContexts.get(name);
@@ -319,7 +319,7 @@ public class ServiceToken implements JSONString {
         // Pull the token data.
         final String tokenDataJson = new String(tokendata, MslConstants.DEFAULT_CHARSET);
         try {
-            final JSONObject tokenDataJO = JSONUtil.readValue(tokenDataJson);
+            final JSONObject tokenDataJO = ReadJson.readValue(tokenDataJson);
             name = tokenDataJO.getString(KEY_NAME);
             if (tokenDataJO.has(KEY_MASTER_TOKEN_SERIAL_NUMBER)) {
                 mtSerialNumber = tokenDataJO.getLong(KEY_MASTER_TOKEN_SERIAL_NUMBER);

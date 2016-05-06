@@ -25,7 +25,7 @@ import com.netflix.msl.MslInternalException;
 import com.netflix.msl.MslUserAuthException;
 import com.netflix.msl.tokens.MasterToken;
 import com.netflix.msl.tokens.UserIdToken;
-import com.netflix.msl.util.JSONUtil;
+import com.netflix.msl.util.ReadJson;
 import com.netflix.msl.util.MslContext;
 
 /**
@@ -117,8 +117,8 @@ public class UserIdTokenAuthenticationData extends UserAuthenticationData {
     public JSONObject getAuthData() throws MslEncodingException {
         try {
             final JSONObject jsonObj = new JSONObject();
-            jsonObj.put(KEY_MASTER_TOKEN, JSONUtil.readValue(masterToken.toJSONString()));
-            jsonObj.put(KEY_USER_ID_TOKEN, JSONUtil.readValue(userIdToken.toJSONString()));
+            jsonObj.put(KEY_MASTER_TOKEN, ReadJson.readValue(masterToken.toJSONString()));
+            jsonObj.put(KEY_USER_ID_TOKEN, ReadJson.readValue(userIdToken.toJSONString()));
             return jsonObj;
         } catch (final JSONException e) {
             throw new MslEncodingException(MslError.JSON_ENCODE_ERROR, "user ID token authdata", e);

@@ -29,7 +29,7 @@ import com.netflix.msl.MslException;
 import com.netflix.msl.MslInternalException;
 import com.netflix.msl.crypto.ICryptoContext;
 import com.netflix.msl.util.Base64;
-import com.netflix.msl.util.JSONUtil;
+import com.netflix.msl.util.ReadJson;
 import com.netflix.msl.util.MslContext;
 
 /**
@@ -234,7 +234,7 @@ public class UserIdToken implements JSONString {
         // Pull the token data.
         final String tokenDataJson = new String(tokendata, MslConstants.DEFAULT_CHARSET);
         try {
-            final JSONObject tokenDataJO = JSONUtil.readValue(tokenDataJson);
+            final JSONObject tokenDataJO = ReadJson.readValue(tokenDataJson);
             renewalWindow = tokenDataJO.getLong(KEY_RENEWAL_WINDOW);
             expiration = tokenDataJO.getLong(KEY_EXPIRATION);
             if (expiration < renewalWindow)
@@ -265,7 +265,7 @@ public class UserIdToken implements JSONString {
         if (userdata != null) {
             final String userDataJson = new String(userdata, MslConstants.DEFAULT_CHARSET);
             try {
-                final JSONObject userDataJO = JSONUtil.readValue(userDataJson);
+                final JSONObject userDataJO = ReadJson.readValue(userDataJson);
                 issuerData = (userDataJO.has(KEY_ISSUER_DATA)) ? userDataJO.getJSONObject(KEY_ISSUER_DATA) : null;
                 final String identity = userDataJO.getString(KEY_IDENTITY);
                 if (identity == null || identity.length() == 0)

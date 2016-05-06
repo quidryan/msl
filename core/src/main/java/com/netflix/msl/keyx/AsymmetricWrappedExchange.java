@@ -63,7 +63,7 @@ import com.netflix.msl.tokens.MasterToken;
 import com.netflix.msl.tokens.TokenFactory;
 import com.netflix.msl.util.AuthenticationUtils;
 import com.netflix.msl.util.Base64;
-import com.netflix.msl.util.JSONUtil;
+import com.netflix.msl.util.ReadJson;
 import com.netflix.msl.util.MslContext;
 
 /**
@@ -797,8 +797,8 @@ public class AsymmetricWrappedExchange extends KeyExchangeFactory {
                 final byte[] hmacJwkBytes = unwrapCryptoContext.unwrap(response.getHmacKey());
                 final JSONObject encryptionJwkJo, hmacJwkJo;
                 try {
-                    encryptionJwkJo = JSONUtil.readValue(new String(encryptionJwkBytes, MslConstants.DEFAULT_CHARSET));
-                    hmacJwkJo = JSONUtil.readValue(new String(hmacJwkBytes, MslConstants.DEFAULT_CHARSET));
+                    encryptionJwkJo = ReadJson.readValue(new String(encryptionJwkBytes, MslConstants.DEFAULT_CHARSET));
+                    hmacJwkJo = ReadJson.readValue(new String(hmacJwkBytes, MslConstants.DEFAULT_CHARSET));
                 } catch (final JSONException e) {
                     throw new MslCryptoException(MslError.SESSION_KEY_CREATION_FAILURE, e).setMasterToken(masterToken);
                 }

@@ -25,7 +25,7 @@ import com.netflix.msl.MslEncodingException;
 import com.netflix.msl.MslError;
 import com.netflix.msl.MslInternalException;
 import com.netflix.msl.util.Base64;
-import com.netflix.msl.util.JSONUtil;
+import com.netflix.msl.util.ReadJson;
 
 /**
  * <p>MSL signature envelopes contain all of the information necessary for
@@ -145,7 +145,7 @@ public class MslSignatureEnvelope {
                 try {
                     // We expect the byte representation to be a JSON string.
                     final String json = new String(envelope, MslConstants.DEFAULT_CHARSET);
-                    final JSONObject envelopeJo = JSONUtil.readValue(json);
+                    final JSONObject envelopeJo = ReadJson.readValue(json);
                     
                     // Verify version.
                     try {
@@ -201,7 +201,7 @@ public class MslSignatureEnvelope {
             // If this is a JSON object, we expect the byte representation to
             // be a JSON string.
             final String json = new String(envelope, MslConstants.DEFAULT_CHARSET);
-            envelopeJo = JSONUtil.readValue(json);
+            envelopeJo = ReadJson.readValue(json);
         } catch (final JSONException e) {
             envelopeJo = null;
         }
