@@ -60,6 +60,7 @@ import com.netflix.msl.msg.MslControl;
 import com.netflix.msl.userauth.EmailPasswordStore;
 import com.netflix.msl.userauth.UserAuthenticationScheme;
 
+import com.netflix.msl.util.Base64;
 import mslcli.common.Pair;
 import mslcli.common.Triplet;
 import mslcli.common.entityauth.EntityAuthenticationHandle;
@@ -237,7 +238,7 @@ public final class AppContext {
         }
         if (s.startsWith("b64:")) {
             try {
-                return Base64Util.decodeToByteArray(s.trim().substring(4));
+                return Base64.decode(s.trim().substring(4));
             } catch (IllegalArgumentException e) {
                 throw new ConfigurationException("Invalid Base64 Value " + s);
             }

@@ -71,7 +71,7 @@ public class Base64 {
     /**
      * Set the backing implementation.
      * 
-     * @param provider the backing implementation.
+     * @param impl the backing implementation.
      * @throws NullPointerException if the provider is {@code null}.
      */
     public static void setImpl(final Base64Impl impl) {

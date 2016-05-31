@@ -15,7 +15,6 @@
  */
 package com.netflix.msl.msg;
 
-import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
@@ -50,6 +49,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+import com.netflix.msl.io.ConnectionProvider;
+import com.netflix.msl.io.DelayedInputStream;
+import com.netflix.msl.io.InputOutputPair;
+import com.netflix.msl.io.SimpleConnectionProvider;
+import com.netflix.msl.io.UrlConnectionProvider;
 import org.json.JSONObject;
 
 import com.netflix.msl.MslConstants;
@@ -1821,7 +1825,7 @@ public class MslControl {
      * @throws InterruptedException if the thread is interrupted while trying
      *         to delete an old master token the received message is replacing.
      */
-    private SendReceiveResult sendReceive(final MslContext ctx, final MessageContext msgCtx, final InputStream in, final OutputStream out, final MessageBuilder builder, final boolean receive, final boolean closeStreams, final int timeout) throws IOException, MslEncodingException, MslCryptoException, MslEntityAuthException, MslUserAuthException, MslMessageException, MslMasterTokenException, MslKeyExchangeException, MslException, InterruptedException {
+    private SendReceiveResult sendReceive(final MslContext ctx, final MessageContext msgCtx, final InputOutputPair inputOutputPair, final MessageBuilder builder, final boolean receive, final int timeout) throws IOException, MslEncodingException, MslCryptoException, MslEntityAuthException, MslUserAuthException, MslMessageException, MslMasterTokenException, MslKeyExchangeException, MslException, InterruptedException {
         // Attempt to acquire the renewal lock.
         final BlockingQueue<MasterToken> renewalQueue = new ArrayBlockingQueue<MasterToken>(1, true);
         final boolean renewing;
@@ -1845,7 +1849,7 @@ public class MslControl {
         try {
             // Send the request.
             builder.setRenewable(renewing);
-            sent = send(ctx, msgCtx, out, builder, closeStreams);
+            sent = send(ctx, msgCtx, inputOutputPair.getOutputStream(), builder, inputOutputPair.shouldClose());
             
             // Receive the response if expected, if we sent a handshake request,
             // if key request data was included, or if a master token and user
@@ -1855,8 +1859,8 @@ public class MslControl {
             if (receive || sent.handshake || !keyRequestData.isEmpty() ||
                 (requestHeader.isRenewable() && requestHeader.getMasterToken() != null && requestHeader.getUserAuthenticationData() != null))
             {
-                response = receive(ctx, msgCtx, in, requestHeader);
-                response.closeSource(closeStreams);
+                response = receive(ctx, msgCtx, inputOutputPair.getInputStream(), requestHeader);
+                response.closeSource(inputOutputPair.shouldClose());
                 
                 // If we received an error response then cleanup.
                 final ErrorHeader errorHeader = response.getErrorHeader();
@@ -2148,10 +2152,8 @@ public class MslControl {
         private final MslContext ctx;
         /** Message context. */
         private final MessageContext msgCtx;
-        /** Remote entity input stream. */
-        private final InputStream in;
-        /** Remote entity output stream. */
-        private final OutputStream out;
+        /** Provide streams to remote entity */
+        private final InputOutputPair inputOutputPair;
         /** Read timeout in milliseconds. */
         private final int timeout;
         
@@ -2160,15 +2162,13 @@ public class MslControl {
          * 
          * @param ctx MSL context.
          * @param msgCtx message context.
-         * @param in remote entity input stream.
-         * @param out remote entity output stream.
+         * @param inputStreamPair streams to remote entity.
          * @param timeout renewal lock aquisition timeout in milliseconds.
          */
-        public ReceiveService(final MslContext ctx, final MessageContext msgCtx, final InputStream in, final OutputStream out, final int timeout) {
+        public ReceiveService(final MslContext ctx, final MessageContext msgCtx, final InputOutputPair inputStreamPair, final int timeout) {
             this.ctx = ctx;
             this.msgCtx = msgCtx;
-            this.in = in;
-            this.out = out;
+            this.inputOutputPair = inputStreamPair;
             this.timeout = timeout;
         }
         
@@ -2189,7 +2189,7 @@ public class MslControl {
             // Read the incoming message.
             final MessageInputStream request;
             try {
-                request = receive(ctx, msgCtx, in, null);
+                request = receive(ctx, msgCtx, inputOutputPair.getInputStream(), null);
             } catch (final InterruptedException e) {
                 // We were cancelled so return null.
                 return null;
@@ -2206,7 +2206,7 @@ public class MslControl {
                     final String userMessage = messageRegistry.getUserMessage(error, null);
                     final ErrorHeader errorHeader = MessageBuilder.createErrorResponse(ctx, recipient, e.getMessageId(), error, userMessage);
                     if (debugCtx != null) debugCtx.sentHeader(errorHeader);
-                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, out, MslConstants.DEFAULT_CHARSET, errorHeader);
+                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, inputOutputPair.getOutputStream(), MslConstants.DEFAULT_CHARSET, errorHeader);
                     response.close();
                 } catch (final Throwable rt) {
                     // If we were cancelled then return null.
@@ -2223,7 +2223,7 @@ public class MslControl {
                 try {
                     final ErrorHeader errorHeader = MessageBuilder.createErrorResponse(ctx, null, null, MslError.INTERNAL_EXCEPTION, null);
                     if (debugCtx != null) debugCtx.sentHeader(errorHeader);
-                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, out, MslConstants.DEFAULT_CHARSET, errorHeader);
+                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, inputOutputPair.getOutputStream(), MslConstants.DEFAULT_CHARSET, errorHeader);
                     response.close();
                 } catch (final Throwable rt) {
                     // If we were cancelled then return null.
@@ -2254,7 +2254,7 @@ public class MslControl {
                     final Long requestMessageId = requestHeader.getMessageId();
                     final ErrorHeader errorHeader = MessageBuilder.createErrorResponse(ctx, recipient, requestMessageId, MslError.INTERNAL_EXCEPTION, null);
                     if (debugCtx != null) debugCtx.sentHeader(errorHeader);
-                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, out, MslConstants.DEFAULT_CHARSET, errorHeader);
+                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, inputOutputPair.getOutputStream(), MslConstants.DEFAULT_CHARSET, errorHeader);
                     response.close();
                 } catch (final Throwable rt) {
                     // If we were cancelled then return null.
@@ -2287,7 +2287,7 @@ public class MslControl {
                     final String userMessage = messageRegistry.getUserMessage(error, languages);
                     final ErrorHeader errorHeader = MessageBuilder.createErrorResponse(ctx, recipient, e.getMessageId(), error, userMessage);
                     if (debugCtx != null) debugCtx.sentHeader(errorHeader);
-                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, out, MslConstants.DEFAULT_CHARSET, errorHeader);
+                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, inputOutputPair.getOutputStream(), MslConstants.DEFAULT_CHARSET, errorHeader);
                     response.close();
                 } catch (final Throwable rt) {
                     // If we were cancelled then return null.
@@ -2306,7 +2306,7 @@ public class MslControl {
                     final Long requestMessageId = requestHeader.getMessageId();
                     final ErrorHeader errorHeader = MessageBuilder.createErrorResponse(ctx, recipient, requestMessageId, MslError.INTERNAL_EXCEPTION, null);
                     if (debugCtx != null) debugCtx.sentHeader(errorHeader);
-                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, out, MslConstants.DEFAULT_CHARSET, errorHeader);
+                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, inputOutputPair.getOutputStream(), MslConstants.DEFAULT_CHARSET, errorHeader);
                     response.close();
                 } catch (final Throwable rt) {
                     // If we were cancelled then return null.
@@ -2327,7 +2327,7 @@ public class MslControl {
             if (!ctx.isPeerToPeer()) {
                 try {
                     responseBuilder.setRenewable(false);
-                    send(ctx, keyxMsgCtx, out, responseBuilder, false);
+                    send(ctx, keyxMsgCtx, inputOutputPair.getOutputStream(), responseBuilder, false);
                     return null;
                 } catch (final InterruptedException e) {
                     // We were cancelled so return null.
@@ -2346,7 +2346,7 @@ public class MslControl {
                         final String userMessage = messageRegistry.getUserMessage(error, languages);
                         final ErrorHeader errorHeader = MessageBuilder.createErrorResponse(ctx, recipient, requestMessageId, error, userMessage);
                         if (debugCtx != null) debugCtx.sentHeader(errorHeader);
-                        final MessageOutputStream response = streamFactory.createOutputStream(ctx, out, MslConstants.DEFAULT_CHARSET, errorHeader);
+                        final MessageOutputStream response = streamFactory.createOutputStream(ctx, inputOutputPair.getOutputStream(), MslConstants.DEFAULT_CHARSET, errorHeader);
                         response.close();
                     } catch (final Throwable rt) {
                         // If we were cancelled then return null.
@@ -2365,7 +2365,7 @@ public class MslControl {
                         final Long requestMessageId = requestHeader.getMessageId();
                         final ErrorHeader errorHeader = MessageBuilder.createErrorResponse(ctx, recipient, requestMessageId, MslError.MSL_COMMS_FAILURE, null);
                         if (debugCtx != null) debugCtx.sentHeader(errorHeader);
-                        final MessageOutputStream response = streamFactory.createOutputStream(ctx, out, MslConstants.DEFAULT_CHARSET, errorHeader);
+                        final MessageOutputStream response = streamFactory.createOutputStream(ctx, inputOutputPair.getOutputStream(), MslConstants.DEFAULT_CHARSET, errorHeader);
                         response.close();
                     } catch (final Throwable rt) {
                         // If we were cancelled then return null.
@@ -2384,7 +2384,7 @@ public class MslControl {
                         final Long requestMessageId = requestHeader.getMessageId();
                         final ErrorHeader errorHeader = MessageBuilder.createErrorResponse(ctx, recipient, requestMessageId, MslError.INTERNAL_EXCEPTION, null);
                         if (debugCtx != null) debugCtx.sentHeader(errorHeader);
-                        final MessageOutputStream response = streamFactory.createOutputStream(ctx, out, MslConstants.DEFAULT_CHARSET, errorHeader);
+                        final MessageOutputStream response = streamFactory.createOutputStream(ctx, inputOutputPair.getOutputStream(), MslConstants.DEFAULT_CHARSET, errorHeader);
                         response.close();
                     } catch (final Throwable rt) {
                         // If we were cancelled then return null.
@@ -2409,7 +2409,8 @@ public class MslControl {
             // released when the service executes.
             //
             // We have received one message.
-            final RequestService service = new RequestService(ctx, keyxMsgCtx, in, out, responseBuilder, timeout, 1);
+            ConnectionProvider connectionProvider = new SimpleConnectionProvider(inputOutputPair.getInputStream(), inputOutputPair.getOutputStream());
+            final RequestService service = new RequestService(ctx, keyxMsgCtx, connectionProvider, responseBuilder, timeout, 1);
             final MslChannel channel = service.call();
             
             // The MSL channel message output stream can be discarded since it
@@ -2433,10 +2434,8 @@ public class MslControl {
         private final MessageContext msgCtx;
         /** Request message input stream. */
         private final MessageInputStream request;
-        /** Remote entity input stream. */
-        private final InputStream in;
-        /** Remote entity output stream. */
-        private final OutputStream out;
+        /** Remote entity streams. */
+        private final InputOutputPair inputOutputPair;
         /** Read timeout in milliseconds. */
         private final int timeout;
         
@@ -2445,18 +2444,16 @@ public class MslControl {
          * 
          * @param ctx MSL context.
          * @param msgCtx message context.
-         * @param in remote entity input stream.
-         * @param out remote entity output stream.
+         * @param inputOutputPair remote entity streams.
          * @param request request message input stream.
          * @param timeout renewal lock acquisition timeout in milliseconds.
          */
-        public RespondService(final MslContext ctx, final MessageContext msgCtx, final InputStream in, final OutputStream out, final MessageInputStream request, final int timeout) {
+        public RespondService(final MslContext ctx, final MessageContext msgCtx, final InputOutputPair inputOutputPair, final MessageInputStream request, final int timeout) {
             if (request.getErrorHeader() != null)
                 throw new MslInternalException("Respond service created for an error message.");
             this.ctx = ctx;
             this.msgCtx = msgCtx;
-            this.in = in;
-            this.out = out;
+            this.inputOutputPair = inputOutputPair;
             this.request = request;
             this.timeout = timeout;
         }
@@ -2505,7 +2502,7 @@ public class MslControl {
                         final long requestMessageId = MessageBuilder.decrementMessageId(builder.getMessageId());
                         final ErrorHeader errorHeader = MessageBuilder.createErrorResponse(ctx, recipient, requestMessageId, securityRequired, null);
                         if (debugCtx != null) debugCtx.sentHeader(errorHeader);
-                        final MessageOutputStream response = streamFactory.createOutputStream(ctx, out, MslConstants.DEFAULT_CHARSET, errorHeader);
+                        final MessageOutputStream response = streamFactory.createOutputStream(ctx, inputOutputPair.getOutputStream(), MslConstants.DEFAULT_CHARSET, errorHeader);
                         response.close();
                         return null;
                     } catch (final Throwable rt) {
@@ -2526,7 +2523,7 @@ public class MslControl {
                         final long requestMessageId = MessageBuilder.decrementMessageId(builder.getMessageId());
                         final ErrorHeader errorHeader = MessageBuilder.createErrorResponse(ctx, recipient, requestMessageId, MslError.RESPONSE_REQUIRES_MASTERTOKEN, null);
                         if (debugCtx != null) debugCtx.sentHeader(errorHeader);
-                        final MessageOutputStream response = streamFactory.createOutputStream(ctx, out, MslConstants.DEFAULT_CHARSET, errorHeader);
+                        final MessageOutputStream response = streamFactory.createOutputStream(ctx, inputOutputPair.getOutputStream(), MslConstants.DEFAULT_CHARSET, errorHeader);
                         response.close();
                         return null;
                     } catch (final Throwable rt) {
@@ -2539,7 +2536,7 @@ public class MslControl {
                 
                 // Otherwise simply send the response.
                 builder.setRenewable(false);
-                final SendResult result = send(ctx, msgCtx, out, builder, false);
+                final SendResult result = send(ctx, msgCtx, inputOutputPair.getOutputStream(), builder, false);
                 return new MslChannel(request, result.request);
             } finally {
                 // Release the master token lock.
@@ -2588,7 +2585,7 @@ public class MslControl {
                     final long requestMessageId = MessageBuilder.decrementMessageId(builder.getMessageId());
                     final ErrorHeader errorHeader = MessageBuilder.createErrorResponse(ctx, recipient, requestMessageId, MslError.RESPONSE_REQUIRES_MASTERTOKEN, null);
                     if (debugCtx != null) debugCtx.sentHeader(errorHeader);
-                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, out, MslConstants.DEFAULT_CHARSET, errorHeader);
+                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, inputOutputPair.getOutputStream(), MslConstants.DEFAULT_CHARSET, errorHeader);
                     response.close();
                     return null;
                 } catch (final Throwable rt) {
@@ -2603,7 +2600,7 @@ public class MslControl {
             // This adds two to our message count.
             //
             // This will release the master token lock.
-            final SendReceiveResult result = sendReceive(ctx, msgCtx, in, out, builder, false, false, timeout);
+            final SendReceiveResult result = sendReceive(ctx, msgCtx, inputOutputPair, builder, false, timeout);
             final MessageInputStream response = result.response;
             msgCount += 2;
             
@@ -2708,7 +2705,7 @@ public class MslControl {
                     final String userMessage = messageRegistry.getUserMessage(error, languages);
                     final ErrorHeader errorHeader = MessageBuilder.createErrorResponse(ctx, recipient, e.getMessageId(), error, userMessage);
                     if (debugCtx != null) debugCtx.sentHeader(errorHeader);
-                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, out, MslConstants.DEFAULT_CHARSET, errorHeader);
+                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, inputOutputPair.getOutputStream(), MslConstants.DEFAULT_CHARSET, errorHeader);
                     response.close();
                 } catch (final Throwable rt) {
                     throw new MslErrorResponseException("Error building the response.", rt, e);
@@ -2722,7 +2719,7 @@ public class MslControl {
                     final String recipient = MslControl.getIdentity(request);
                     final ErrorHeader errorHeader = MessageBuilder.createErrorResponse(ctx, recipient, null, MslError.INTERNAL_EXCEPTION, null);
                     if (debugCtx != null) debugCtx.sentHeader(errorHeader);
-                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, out, MslConstants.DEFAULT_CHARSET, errorHeader);
+                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, inputOutputPair.getOutputStream(), MslConstants.DEFAULT_CHARSET, errorHeader);
                     response.close();
                 } catch (final Throwable rt) {
                     throw new MslErrorResponseException("Error building the response.", rt, t);
@@ -2759,7 +2756,7 @@ public class MslControl {
                     final long requestMessageId = MessageBuilder.decrementMessageId(builder.getMessageId());
                     final ErrorHeader errorHeader = MessageBuilder.createErrorResponse(ctx, recipient, requestMessageId, MslError.MSL_COMMS_FAILURE, null);
                     if (debugCtx != null) debugCtx.sentHeader(errorHeader);
-                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, out, MslConstants.DEFAULT_CHARSET, errorHeader);
+                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, inputOutputPair.getOutputStream(), MslConstants.DEFAULT_CHARSET, errorHeader);
                     response.close();
                 } catch (final Throwable rt) {
                     // If we were cancelled then return null.
@@ -2782,7 +2779,7 @@ public class MslControl {
                     final String userMessage = messageRegistry.getUserMessage(error, languages);
                     final ErrorHeader errorHeader = MessageBuilder.createErrorResponse(ctx, recipient, requestMessageId, error, userMessage);
                     if (debugCtx != null) debugCtx.sentHeader(errorHeader);
-                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, out, MslConstants.DEFAULT_CHARSET, errorHeader);
+                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, inputOutputPair.getOutputStream(), MslConstants.DEFAULT_CHARSET, errorHeader);
                     response.close();
                 } catch (final Throwable rt) {
                     // If we were cancelled then return null.
@@ -2801,7 +2798,7 @@ public class MslControl {
                     final long requestMessageId = MessageBuilder.decrementMessageId(builder.getMessageId());
                     final ErrorHeader errorHeader = MessageBuilder.createErrorResponse(ctx, recipient, requestMessageId, MslError.INTERNAL_EXCEPTION, null);
                     if (debugCtx != null) debugCtx.sentHeader(errorHeader);
-                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, out, MslConstants.DEFAULT_CHARSET, errorHeader);
+                    final MessageOutputStream response = streamFactory.createOutputStream(ctx, inputOutputPair.getOutputStream(), MslConstants.DEFAULT_CHARSET, errorHeader);
                     response.close();
                 } catch (final Throwable rt) {
                     // If we were cancelled then return null.
@@ -2918,97 +2915,13 @@ public class MslControl {
      * clients, and peer-to-peer servers.</p>
      */
     private class RequestService implements Callable<MslChannel> {
-        /**
-         * A delayed input stream does not open the real input stream until
-         * one of its methods is called.
-         */
-        private class DelayedInputStream extends FilterInputStream {
-            /**
-             * Create a new delayed input stream that will not attempt to
-             * construct the input stream from the URL connection until it is
-             * actually needed (i.e. read from).
-             * 
-             * @param conn backing URL connection.
-             */
-            public DelayedInputStream(final URLConnection conn) {
-                super(null);
-                this.conn = conn;
-            }
-            
-            @Override
-            public int available() throws IOException {
-                if (in == null)
-                    in = conn.getInputStream();
-                return super.available();
-            }
 
-            @Override
-            public void close() throws IOException {
-                if (in == null)
-                    in = conn.getInputStream();
-                super.close();
-            }
-
-            @Override
-            public synchronized void mark(final int readlimit) {
-            }
-
-            @Override
-            public boolean markSupported() {
-                return false;
-            }
-
-            @Override
-            public int read() throws IOException {
-                if (in == null)
-                    in = conn.getInputStream();
-                return in.read();
-            }
-
-            @Override
-            public int read(final byte[] b, final int off, final int len) throws IOException {
-                if (in == null)
-                    in = conn.getInputStream();
-                return super.read(b, off, len);
-            }
-
-            @Override
-            public int read(final byte[] b) throws IOException {
-                if (in == null)
-                    in = conn.getInputStream();
-                return super.read(b);
-            }
-
-            @Override
-            public synchronized void reset() throws IOException {
-                if (in == null)
-                    in = conn.getInputStream();
-                super.reset();
-            }
-
-            @Override
-            public long skip(final long n) throws IOException {
-                if (in == null)
-                    in = conn.getInputStream();
-                return super.skip(n);
-            }
-            
-            /** URL connection providing the input stream. */
-            private final URLConnection conn;
-        }
-        
         /** MSL context. */
         private final MslContext ctx;
         /** Message context. */
         private final MessageContext msgCtx;
-        /** Remote entity URL. */
-        private final URL remoteEntity;
-        /** Remote entity input stream. */
-        private InputStream in;
-        /** Remote entity output stream. */
-        private OutputStream out;
-        /** True if we opened the streams. */
-        private boolean openedStreams;
+        /** Remote connection provider. */
+        private final ConnectionProvider connectionProvider;
         /** Request message builder. */
         private MessageBuilder builder;
         /** Connect and read timeout in milliseconds. */
@@ -3024,17 +2937,14 @@ public class MslControl {
          * 
          * @param ctx MSL context.
          * @param msgCtx message context.
-         * @param remoteEntity remote entity URL.
+         * @param connectionProvider connection provider
          * @param timeout connect, read, and renewal lock acquisition timeout
          *        in milliseconds.
          */
-        public RequestService(final MslContext ctx, final MessageContext msgCtx, final URL remoteEntity, final int timeout) {
+        public RequestService(final MslContext ctx, final MessageContext msgCtx, final ConnectionProvider connectionProvider, final int timeout) {
             this.ctx = ctx;
             this.msgCtx = msgCtx;
-            this.remoteEntity = remoteEntity;
-            this.in = null;
-            this.out = null;
-            this.openedStreams = false;
+            this.connectionProvider = connectionProvider;
             this.builder = null;
             this.timeout = timeout;
             this.msgCount = 0;
@@ -3045,65 +2955,17 @@ public class MslControl {
          * 
          * @param ctx MSL context.
          * @param msgCtx message context.
-         * @param in remote entity input stream.
-         * @param out remote entity output stream.
-         * @param timeout read acquisition timeout in milliseconds.
-         */
-        public RequestService(final MslContext ctx, final MessageContext msgCtx, final InputStream in, final OutputStream out, final int timeout) {
-            this.ctx = ctx;
-            this.msgCtx = msgCtx;
-            this.remoteEntity = null;
-            this.in = in;
-            this.out = out;
-            this.openedStreams = false;
-            this.builder = null;
-            this.timeout = timeout;
-            this.msgCount = 0;
-        }
-        
-        /**
-         * Create a new message request service.
-         * 
-         * @param ctx MSL context.
-         * @param msgCtx message context.
-         * @param remoteEntity remote entity URL.
+         * @param connectionProvider Connection Provider
          * @param builder request message builder.
          * @param timeout connect, read, and renewal lock acquisition timeout
          *        in milliseconds.
          * @param msgCount number of messages that have already been sent or
          *        received.
          */
-        public RequestService(final MslContext ctx, final MessageContext msgCtx, final URL remoteEntity, final MessageBuilder builder, final int timeout, final int msgCount) {
+        public RequestService(final MslContext ctx, final MessageContext msgCtx, ConnectionProvider connectionProvider, final MessageBuilder builder, final int timeout, final int msgCount) {
             this.ctx = ctx;
             this.msgCtx = msgCtx;
-            this.remoteEntity = remoteEntity;
-            this.in = null;
-            this.out = null;
-            this.openedStreams = false;
-            this.builder = builder;
-            this.timeout = timeout;
-            this.msgCount = msgCount;
-        }
-        
-        /**
-         * Create a new message request service.
-         * 
-         * @param ctx MSL context.
-         * @param msgCtx message context.
-         * @param in remote entity input stream.
-         * @param out remote entity output stream.
-         * @param builder request message builder.
-         * @param timeout renewal lock acquisition timeout in milliseconds.
-         * @param msgCount number of messages that have already been sent or
-         *        received.
-         */
-        public RequestService(final MslContext ctx, final MessageContext msgCtx, final InputStream in, final OutputStream out, final MessageBuilder builder, final int timeout, final int msgCount) {
-            this.ctx = ctx;
-            this.msgCtx = msgCtx;
-            this.remoteEntity = null;
-            this.in = in;
-            this.out = out;
-            this.openedStreams = false;
+            this.connectionProvider = connectionProvider;
             this.builder = builder;
             this.timeout = timeout;
             this.msgCount = msgCount;
@@ -3143,7 +3005,7 @@ public class MslControl {
             // message count.
             //
             // This will release the master token lock.
-            final SendReceiveResult result = sendReceive(ctx, msgCtx, in, out, builder, true, openedStreams, timeout);
+            final SendReceiveResult result = sendReceive(ctx, msgCtx, connectionProvider.provide(openedStreams), builder, true, timeout);
             final MessageOutputStream request = result.request;
             final MessageInputStream response = result.response;
             msgCount += 2;
@@ -3186,7 +3048,7 @@ public class MslControl {
                 if (!ctx.isPeerToPeer()) {
                     // The master token lock acquired from buildErrorResponse()
                     // will be released when the service executes.
-                    final RequestService service = new RequestService(ctx, resendMsgCtx, remoteEntity, requestBuilder, timeout, msgCount);
+                    final RequestService service = new RequestService(ctx, resendMsgCtx, connectionProvider, requestBuilder, timeout, msgCount);
                     newChannel = service.call();
                     maxMessagesHit = service.maxMessagesHit;
                 } else {
@@ -3240,7 +3102,7 @@ public class MslControl {
                 // released when the service executes.
                 final MessageContext resendMsgCtx = new ResendMessageContext(null, msgCtx);
                 final MessageBuilder requestBuilder = buildResponse(ctx, msgCtx, responseHeader);
-                final RequestService service = new RequestService(ctx, resendMsgCtx, remoteEntity, requestBuilder, timeout, msgCount);
+                final RequestService service = new RequestService(ctx, resendMsgCtx, connectionProvider, requestBuilder, timeout, msgCount);
                 return service.call();
             }
             
@@ -3361,64 +3223,50 @@ public class MslControl {
         public MslChannel call() throws MslException, IOException {
             // If we do not already have a connection then establish one.
             final int lockTimeout;
-            if (in == null || out == null) {
-                try {
-                    // Set up the connection.
-                    final URLConnection connection = remoteEntity.openConnection();
-                    connection.setConnectTimeout(timeout);
-                    connection.setReadTimeout(timeout);
-                    connection.setDoOutput(true);
-                    connection.setDoInput(true);
-                    
-                    // Connect. Keep track of how much time this takes to subtract
-                    // that from the lock timeout timeout.
-                    final long start = System.currentTimeMillis();
-                    connection.connect();
-                    out = connection.getOutputStream();
-                    in = new DelayedInputStream(connection);
-                    lockTimeout = timeout - (int)(System.currentTimeMillis() - start);
-                    openedStreams = true;
-                } catch (final IOException e) {
-                    // If a message builder was provided then release the
-                    // master token read lock.
-                    if (builder != null)
-                        releaseMasterToken(ctx, builder.getMasterToken());
-                    
-                    // Close any open streams.
-                    if (out != null) out.close();
-                    if (in != null) in.close();
-                    
-                    // If we were cancelled then return null.
-                    if (cancelled(e)) return null;
-                    throw e;
-                } catch (final RuntimeException e) {
-                    // If a message builder was provided then release the
-                    // master token read lock.
-                    if (builder != null)
-                        releaseMasterToken(ctx, builder.getMasterToken());
-                    
-                    // Close any open streams.
-                    if (out != null) out.close();
-                    if (in != null) in.close();
-                    
-                    throw e;
-                }
-            } else {
-                lockTimeout = timeout;
+
+            // Set up the connection.
+            InputOutputPair streamPair = connectionProvider.provide();
+
+            try {
+                // Connect. Keep track of how much time this takes to subtract
+                // that from the lock timeout timeout.
+                final long start = System.currentTimeMillis();
+
+                out = streamPair.getOutputStream();
+                in = streamPair.getInputStream();
+
+                lockTimeout = timeout - (int)(System.currentTimeMillis() - start);
+                openedStreams = true;
+            } catch (final IOException e) {
+                // If a message builder was provided then release the
+                // master token read lock.
+                if (builder != null)
+                    releaseMasterToken(ctx, builder.getMasterToken());
+
+                streamPair.close();
+
+                // If we were cancelled then return null.
+                if (cancelled(e)) return null;
+                throw e;
+            } catch (final RuntimeException e) {
+                // If a message builder was provided then release the
+                // master token read lock.
+                if (builder != null)
+                    releaseMasterToken(ctx, builder.getMasterToken());
+
+                streamPair.close();
+
+                throw e;
             }
-            
+
             // If no builder was provided then build a new request. This will
             // acquire the master token lock.
             if (builder == null) {
                 try {
                     builder = buildRequest(ctx, msgCtx);
                 } catch (final InterruptedException e) {
-                    // Close the streams if we opened them.
-                    if (openedStreams) {
-                        out.close();
-                        in.close();
-                    }
-                    
+                    streamPair.close();
+
                     // We were cancelled so return null.
                     return null;
                 }
@@ -3427,49 +3275,21 @@ public class MslControl {
             try {
                 // Execute. This will release the master token lock.
                 final MslChannel channel = execute(msgCtx, builder, lockTimeout, msgCount);
-                
+
                 // If the channel was established clear the cached payloads.
                 if (channel != null && channel.output != null)
                     channel.output.stopCaching();
-                
+
                 // Return the established channel.
                 return channel;
-            } catch (final MslException e) {
-                // Close the streams if we opened them.
-                if (openedStreams) {
-                    out.close();
-                    in.close();
-                }
-                
-                // If we were cancelled then return null.
-                if (cancelled(e)) return null;
-                throw e;
-            } catch (final IOException e) {
-                // Close the streams if we opened them.
-                if (openedStreams) {
-                    out.close();
-                    in.close();
-                }
-                
-                // If we were cancelled then return null.
-                if (cancelled(e)) return null;
-                throw e;
             } catch (final InterruptedException e) {
-                // Close the streams if we opened them.
-                if (openedStreams) {
-                    out.close();
-                    in.close();
-                }
-                
-                // We were cancelled so return null.
+                streamPair.close();
+
+                // If we were cancelled then return null.
                 return null;
-            } catch (final RuntimeException e) {
-                // Close the streams if we opened them.
-                if (openedStreams) {
-                    out.close();
-                    in.close();
-                }
-                
+            } catch (final MslException|IOException|RuntimeException e) {
+                streamPair.close();
+
                 // If we were cancelled then return null.
                 if (cancelled(e)) return null;
                 throw e;
@@ -3508,7 +3328,8 @@ public class MslControl {
      * @return a future for the message.
      */
     public Future<MessageInputStream> receive(final MslContext ctx, final MessageContext msgCtx, final InputStream in, final OutputStream out, final int timeout) {
-        final ReceiveService service = new ReceiveService(ctx, msgCtx, in, out, timeout);
+        InputOutputPair pair = new InputOutputPair(in, out);
+        final ReceiveService service = new ReceiveService(ctx, msgCtx, pair, timeout);
         return executor.submit(service);
     }
     
@@ -3567,7 +3388,8 @@ public class MslControl {
     public Future<MslChannel> respond(final MslContext ctx, final MessageContext msgCtx, final InputStream in, final OutputStream out, final MessageInputStream request, final int timeout) {
         if (request.getErrorHeader() != null)
             throw new IllegalArgumentException("Request message input stream cannot be for an error message.");
-        final RespondService service = new RespondService(ctx, msgCtx, in, out, request, timeout);
+        InputOutputPair inputOutputPair = new InputOutputPair(in, out, false);
+        final RespondService service = new RespondService(ctx, msgCtx, inputOutputPair, request, timeout);
         return executor.submit(service);
     }
     
@@ -3644,13 +3466,14 @@ public class MslControl {
     public Future<MslChannel> request(final MslContext ctx, final MessageContext msgCtx, final URL remoteEntity, final int timeout) {
         if (ctx.isPeerToPeer())
             throw new IllegalStateException("This method cannot be used in peer-to-peer mode.");
-        final RequestService service = new RequestService(ctx, msgCtx, remoteEntity, timeout);
+        ConnectionProvider connectionProvider = new UrlConnectionProvider(remoteEntity, timeout);
+        final RequestService service = new RequestService(ctx, msgCtx, connectionProvider, timeout);
         return executor.submit(service);
     }
     
     /**
      * <p>Send a request to the remote entity over the provided output stream
-     * and receive a resposne over the provided input stream.</p>
+     * and receive a response over the provided input stream.</p>
      * 
      * <p>This method should only be used by peer-to-peer entities when
      * initiating a new request. The remote entity should be using
@@ -3693,7 +3516,8 @@ public class MslControl {
     public Future<MslChannel> request(final MslContext ctx, final MessageContext msgCtx, final InputStream in, final OutputStream out, final int timeout) {
         if (!ctx.isPeerToPeer())
             throw new IllegalStateException("This method cannot be used in trusted network mode.");
-        final RequestService service = new RequestService(ctx, msgCtx, in, out, timeout);
+        ConnectionProvider connectionProvider = new SimpleConnectionProvider(in, out);
+        final RequestService service = new RequestService(ctx, msgCtx, connectionProvider, timeout);
         return executor.submit(service);
     }
     
@@ -3712,7 +3536,7 @@ public class MslControl {
      * queue is used to wait for a master token from a different thread if the
      * message requires one.
      */
-    private final ConcurrentHashMap<MslContext,BlockingQueue<MasterToken>> renewingContexts = new ConcurrentHashMap<MslContext,BlockingQueue<MasterToken>>();
+    private final ConcurrentHashMap<MslContext,BlockingQueue<MasterToken>> renewingContexts = new ConcurrentHashMap<>();
     /** Dummy master token used to release the renewal lock. */
     private final MasterToken NULL_MASTER_TOKEN;
 
@@ -3720,5 +3544,6 @@ public class MslControl {
      * Map of in-flight master token read-write locks by MSL context and master
      * token.
      */
-    private final ConcurrentHashMap<MslContextMasterTokenKey,ReadWriteLock> masterTokenLocks = new ConcurrentHashMap<MslContextMasterTokenKey,ReadWriteLock>();
+    private final ConcurrentHashMap<MslContextMasterTokenKey,ReadWriteLock> masterTokenLocks = new ConcurrentHashMap<>();
+
 }
