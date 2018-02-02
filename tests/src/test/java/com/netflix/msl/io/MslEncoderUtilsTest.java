@@ -471,8 +471,7 @@ public class MslEncoderUtilsTest {
         assertTrue(MslEncoderUtils.equalObjects(mo1, mo2));
         assertEquals(MslEncoderUtils.hashObject(mo2), MslEncoderUtils.hashObject(mo1));
         
-        final String[] keys = mo1.getKeys().toArray(new String[0]);
-        final String key = keys[0];
+        final String key = mo1.getKeys().iterator().next();
         final Object value = mo1.get(key);
         mo1.remove(key);
         mo1.put(key + "x", value);
