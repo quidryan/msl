@@ -275,6 +275,10 @@ public class LZWOutputStream extends OutputStream {
      * @return the MSB-first byte representation of the codes.
      */
     private static byte[] codesToBytes(final LinkedList<Code> codes) {
+//        for(Code writingCode: codes) {
+//            System.out.println(String.format("writing %d with %d bits", writingCode.value, writingCode.bits));
+//        }
+
         final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         byte b = 0;
         int available = Byte.SIZE;
